@@ -47,7 +47,7 @@ echo "Step 3: Generating HTML..."
 HTML_FILE="$TEMP_DIR/index.html"
 GENERATED_DATE=$(date '+%Y-%m-%d %H:%M')
 
-# Build the Table Rows using jq (much faster/cleaner than a bash loop)
+# Build the Table Rows using jq
 TABLE_ROWS=$(echo "$RAW_DATA" | jq -s 'sort_by(.[0]) | .[] | 
     "<tr><td class=\"asn\">\(.[0])</td><td class=\"title\">\(.[1] | @html)</td><td class=\"date\">\(.[2])</td></tr>"' -r)
 
