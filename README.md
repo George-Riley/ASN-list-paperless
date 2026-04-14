@@ -20,3 +20,6 @@ A streamlined Bash script designed specifically for the **Unraid User Scripts pl
 ## **📦 Output**
 * **`Paperless_ASN_Index.pdf`**: A clean, printable table for physical filing reference.
 * **`paperless_index.csv`**: A raw data export for spreadsheet use.
+
+## **🗺️ Roadmap**
+* [ ] **Email Updates**: Implement weekly email notifications that trigger only if the PDF content has changed (new documents added).
