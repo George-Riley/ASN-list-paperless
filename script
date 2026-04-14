@@ -86,11 +86,24 @@ EOF
 
 # 4. Convert to PDF
 echo "Step 4: Converting to PDF..."
-docker run --rm -v "$TEMP_DIR:$TEMP_DIR" -v "$OUTPUT_DIR:$OUTPUT_DIR" \
-    madnight/docker-alpine-wkhtmltopdf:latest \
-    wkhtmltopdf --enable-local-file-access --load-error-handling ignore "$HTML_FILE" "$PDF_FILE" \
-    > /dev/null 2>&1
 
-echo "================================================"
-echo "✓ COMPLETE: $PDF_FILE ($(du -h "$PDF_FILE" | cut -f1))"
-echo "================================================"
+docker run --rm \
+    -v "$TEMP_DIR:$TEMP_DIR" \
+    -v "$OUTPUT_DIR:$OUTPUT_DIR" \
+    --entrypoint wkhtmltopdf \
+    madnight/docker-alpine-wkhtmltopdf:latest \
+    -q --enable-local-file-access --load-error-handling ignore \
+    "$HTML_FILE" "$PDF_FILE"
+    
+# Give the Unraid fuse filesystem a moment to catch up
+sleep 1
+
+if [ -f "$PDF_FILE" ]; then
+    PDF_SIZE=$(du -h "$PDF_FILE" | cut -f1)
+    echo "================================================"
+    echo "✓ COMPLETE: $PDF_FILE ($PDF_SIZE)"
+    echo "================================================"
+else
+    echo "❌ ERROR: PDF was not created. Check Docker logs."
+    exit 1
+fi
