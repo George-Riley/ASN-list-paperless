@@ -23,3 +23,7 @@ A streamlined Bash script designed specifically for the **Unraid User Scripts pl
 
 ## **🗺️ Roadmap**
 * [ ] **Email Updates**: Implement weekly email notifications that trigger only if the PDF content has changed (new documents added).
+
+
+---
+Disclaimer : *AI assisted coding (formatting) & AI assisted documentation*.
