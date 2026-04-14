@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# Paperless-NGX ASN Index PDF Generator
+set -euo pipefail
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+PAPERLESS_URL="https://SUB.DOMAIN.net"
+API_TOKEN="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+OUTPUT_DIR="/mnt/user/Paperless"
+CSV_FILE="$OUTPUT_DIR/paperless_index.csv"
+PDF_FILE="$OUTPUT_DIR/Paperless_ASN_Index.pdf"
+TEMP_DIR=$(mktemp -d)
+# ============================================================================
+
+# Cleanup on exit
+cleanup() { rm -rf "$TEMP_DIR"; }
+trap cleanup EXIT
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "================================================"
+echo "Paperless ASN Index PDF Generator"
+echo "================================================"
+
+# 1. Fetch documents
+echo "Step 1: Fetching documents..."
+RESPONSE=$(curl -s -H "Authorization: Token $API_TOKEN" \
+  "$PAPERLESS_URL/api/documents/?page_size=10000")
+
+# 2. Parse JSON and generate CSV
+echo "Step 2: Parsing documents..."
+# Extract data once into a temporary format
+RAW_DATA=$(echo "$RESPONSE" | jq -r '.results | .[] | select(.archive_serial_number != null) | 
+    [.archive_serial_number, .title, (.document_date // (.created | .[0:10]) // "N/A")]')
+
+# Generate CSV
+echo "ASN,Title,Document Date" > "$CSV_FILE"
+echo "$RAW_DATA" | jq -r '(. | @csv)' | sort -t',' -k1 -n >> "$CSV_FILE"
+
+COUNT=$(($(wc -l < "$CSV_FILE") - 1))
+echo "✓ Extracted $COUNT documents"
+
+# 3. Generate HTML
+echo "Step 3: Generating HTML..."
+HTML_FILE="$TEMP_DIR/index.html"
+GENERATED_DATE=$(date '+%Y-%m-%d %H:%M')
+
+# Build the Table Rows using jq (much faster/cleaner than a bash loop)
+TABLE_ROWS=$(echo "$RAW_DATA" | jq -s 'sort_by(.[0]) | .[] | 
+    "<tr><td class=\"asn\">\(.[0])</td><td class=\"title\">\(.[1] | @html)</td><td class=\"date\">\(.[2])</td></tr>"' -r)
+
+cat <<EOF > "$HTML_FILE"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Paperless ASN Index</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 10mm; color: #333; }
+        .header { text-align: center; margin-bottom: 10mm; border-bottom: 2px solid #333; }
+        .header p { font-size: 10px; color: #666; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        th { background: #333; color: white; padding: 6px; text-align: left; }
+        td { padding: 5px 6px; border: 1px solid #ddd; word-break: break-word; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .asn { width: 40px; text-align: right; font-weight: bold; }
+        .date { width: 60px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Paperless ASN Index</h1>
+        <p>Generated: $GENERATED_DATE</p>
+    </div>
+    <table>
+        <thead><tr><th>ASN</th><th>Title</th><th>Date</th></tr></thead>
+        <tbody>
+            $TABLE_ROWS
+        </tbody>
+    </table>
+</body>
+</html>
+EOF
+
+# 4. Convert to PDF
+echo "Step 4: Converting to PDF..."
+docker run --rm -v "$TEMP_DIR:$TEMP_DIR" -v "$OUTPUT_DIR:$OUTPUT_DIR" \
+    madnight/docker-alpine-wkhtmltopdf:latest \
+    wkhtmltopdf --enable-local-file-access --load-error-handling ignore "$HTML_FILE" "$PDF_FILE" \
+    > /dev/null 2>&1
+
+echo "================================================"
+echo "✓ COMPLETE: $PDF_FILE ($(du -h "$PDF_FILE" | cut -f1))"
+echo "================================================"
